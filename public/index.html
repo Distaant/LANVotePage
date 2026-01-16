@@ -134,7 +134,9 @@
             ],
             votes: [],
             categories: [],
-            name: 'Demo Session'
+            name: 'Demo Session',
+            connectedClients: 0,
+            lastSessionClientCount: 0
         };
 
         function ThemeToggle({ isDark, toggle }) {
@@ -167,6 +169,137 @@
                                 Got it
                             </button>
                         </div>
+                    </div>
+                </div>
+            );
+        }
+
+        /**
+         * Reusable Results Component
+         * Used by both Host and Student views
+         */
+        function ResultsView({ gameState, onClose }) {
+            // Group all votes by Main Subject -> Sub Subject
+            const summaryData = {};
+            (gameState.votes || []).forEach(vote => {
+                if (!summaryData[vote.mainSubject]) summaryData[vote.mainSubject] = {};
+                if (!summaryData[vote.mainSubject][vote.subject]) summaryData[vote.mainSubject][vote.subject] = [];
+                summaryData[vote.mainSubject][vote.subject].push(vote);
+            });
+
+            return (
+                <div className="fixed inset-0 z-[60] min-h-screen bg-zinc-100 dark:bg-zinc-950 p-6 md:p-8 overflow-y-auto animate-fadeIn">
+                     <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto w-full">
+                        <div>
+                            <h1 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white mb-2">Session Results</h1>
+                            <p className="text-zinc-500 text-lg font-medium">Classroom Performance Summary</p>
+                        </div>
+                        <button 
+                            onClick={onClose}
+                            className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-8 py-3 rounded-xl font-bold text-lg hover:opacity-90 transition shadow-lg"
+                        >
+                            Close
+                        </button>
+                    </header>
+
+                    <div className="grid grid-cols-1 gap-6 max-w-7xl mx-auto pb-20">
+                        {Object.keys(summaryData).length === 0 && (
+                            <div className="text-center py-20 text-zinc-400 font-bold text-xl">No votes recorded yet.</div>
+                        )}
+
+                        {Object.entries(summaryData).map(([mainSubject, subSubjects]) => {
+                            // Calculate Overall Group Score
+                            let groupTotalSum = 0;
+                            let groupTotalCount = 0;
+                            
+                            Object.values(subSubjects).forEach(votes => {
+                                votes.forEach(v => {
+                                    gameState.categories.forEach(cat => {
+                                         groupTotalSum += parseFloat(v.scores[cat.id] || 0);
+                                         groupTotalCount++;
+                                    });
+                                });
+                            });
+
+                            const groupOverallAverage = groupTotalCount ? (groupTotalSum / groupTotalCount).toFixed(2) : "0.00";
+
+                            return (
+                            <div key={mainSubject} className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-4 gap-4">
+                                    <h2 className="text-2xl font-black text-zinc-900 dark:text-white">{mainSubject}</h2>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-zinc-400 text-sm font-bold uppercase tracking-wider">Overall Group Score</span>
+                                        <span className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-2 rounded-lg font-black text-xl">{groupOverallAverage}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col gap-2">
+                                    {/* Table Header */}
+                                    <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-bold text-zinc-400 uppercase tracking-wider hidden md:grid">
+                                        <div className="col-span-3">Participant / Item</div>
+                                        <div className="col-span-7">Category Breakdown</div>
+                                        <div className="col-span-2 text-right">Average</div>
+                                    </div>
+
+                                    {Object.entries(subSubjects).map(([subName, votes]) => {
+                                        // Calculate average for this sub-item
+                                        let totalSum = 0;
+                                        const catScores = {};
+                                        
+                                        votes.forEach(v => {
+                                            gameState.categories.forEach(cat => {
+                                                const s = parseFloat(v.scores[cat.id] || 0);
+                                                catScores[cat.id] = (catScores[cat.id] || 0) + s;
+                                                totalSum += s;
+                                            });
+                                        });
+                                        
+                                        const catAvgs = gameState.categories.map(cat => ({
+                                            ...cat,
+                                            avg: (catScores[cat.id] / votes.length).toFixed(1)
+                                        }));
+
+                                        const totalAvg = (totalSum / (votes.length * gameState.categories.length)).toFixed(2);
+
+                                        // Display Name Cleanup
+                                        let displayName = subName;
+                                        if (subName === mainSubject || subName === `${mainSubject} (Group)`) displayName = "Group Evaluation";
+                                        else displayName = subName.replace(`${mainSubject} - `, '');
+
+                                        return (
+                                            <div key={subName} className="bg-zinc-50 dark:bg-zinc-950/30 rounded-xl p-4 md:grid md:grid-cols-12 md:gap-4 md:items-center hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700">
+                                                
+                                                {/* Name */}
+                                                <div className="md:col-span-3 flex justify-between md:block mb-2 md:mb-0">
+                                                    <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">{displayName}</h3>
+                                                    <span className="md:hidden text-xs font-bold bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-500">{votes.length} votes</span>
+                                                </div>
+
+                                                {/* Scores Breakdown */}
+                                                <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 mb-3 md:mb-0">
+                                                    {catAvgs.map((cat, i) => (
+                                                        <div key={cat.id} className="flex items-center gap-2">
+                                                            <div className={`w-2 h-2 rounded-full ${COLORS[i % COLORS.length]} flex-shrink-0`}></div>
+                                                            <span className="text-xs font-bold text-zinc-500 truncate max-w-[80px]">{cat.name}:</span>
+                                                            <span className="text-sm font-black text-zinc-900 dark:text-white">{cat.avg}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Total Average */}
+                                                <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-zinc-100 dark:border-zinc-800 pt-2 md:pt-0">
+                                                     <span className="md:hidden text-xs font-bold text-zinc-400 uppercase">Total Score</span>
+                                                     <div className="flex items-center gap-3">
+                                                        <span className="hidden md:inline text-xs font-bold text-zinc-300">{votes.length} votes</span>
+                                                        <span className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">{totalAvg}</span>
+                                                     </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )})}
                     </div>
                 </div>
             );
@@ -318,6 +451,17 @@
             
             // Calculate unique voters
             const uniqueVoters = new Set(currentVotes.map(v => v.clientId)).size;
+            
+            // Get Total Clients - Subtract 1 for Host (Teacher)
+            // If gameState.connectedClients is undefined (mock), default to 1 so subtraction gives 0 students
+            const totalConnections = gameState.connectedClients || 1;
+            
+            // If voting is open, use LIVE count. If closed, use HISTORICAL snapshot.
+            // Fallback to totalConnections if historical is missing (legacy)
+            const activeTotal = gameState.isVotingOpen ? totalConnections : (gameState.lastSessionClientCount || totalConnections);
+            
+            const studentCount = Math.max(0, activeTotal - 1);
+            const liveStudentCount = Math.max(0, totalConnections - 1); // Always need live for the 'Connected' badge
 
             // Live Update Fix:
             // Regardless of voting mode, we want to show the aggregate "Group Grade" on the main screen.
@@ -377,7 +521,7 @@
                             </div>
                             <button 
                                 onClick={() => socket.emit('host-update-status', { isVotingOpen: false })} 
-                                className="bg-red-600 hover:bg-red-500 text-white px-10 py-6 rounded-3xl font-black text-2xl flex items-center gap-4 transition-all shadow-lg shadow-red-500/20"
+                                className="bg-red-600 hover:bg-red-500 text-white px-10 py-6 rounded-3xl font-black text-2xl flex items-center gap-4 transition-all shadow-lg"
                             >
                                 <IconStop /> END VOTING
                             </button>
@@ -388,8 +532,9 @@
                             
                             {/* Huge Vote Counter */}
                             <div className="text-center animate-fadeIn">
-                                <div className="text-[12rem] leading-none font-black text-zinc-900 dark:text-white tabular-nums tracking-tighter">
+                                <div className="text-[12rem] leading-none font-black text-zinc-900 dark:text-white tabular-nums tracking-tighter flex items-baseline">
                                     {uniqueVoters}
+                                    <span className="text-[6rem] text-zinc-300 dark:text-zinc-700 ml-4">/{studentCount}</span>
                                 </div>
                                 <div className="text-zinc-500 font-black uppercase tracking-[0.2em] text-2xl mt-4">Voters</div>
                             </div>
@@ -422,130 +567,7 @@
 
             // SUMMARY VIEW (Shown when user clicks "View Results" or End Session)
             if (showSummary) {
-                // Group all votes by Main Subject -> Sub Subject
-                const summaryData = {};
-                (gameState.votes || []).forEach(vote => {
-                    if (!summaryData[vote.mainSubject]) summaryData[vote.mainSubject] = {};
-                    if (!summaryData[vote.mainSubject][vote.subject]) summaryData[vote.mainSubject][vote.subject] = [];
-                    summaryData[vote.mainSubject][vote.subject].push(vote);
-                });
-
-                return (
-                    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 p-6 md:p-8">
-                         <header className="flex justify-between items-center mb-8">
-                            <div>
-                                <h1 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white mb-2">Session Results</h1>
-                                <p className="text-zinc-500 text-lg font-medium">Classroom Performance Summary</p>
-                            </div>
-                            <button 
-                                onClick={() => setShowSummary(false)}
-                                className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-8 py-3 rounded-xl font-bold text-lg hover:opacity-90 transition"
-                            >
-                                Back to Dashboard
-                            </button>
-                        </header>
-
-                        <div className="grid grid-cols-1 gap-6 max-w-7xl mx-auto">
-                            {Object.keys(summaryData).length === 0 && (
-                                <div className="text-center py-20 text-zinc-400 font-bold text-xl">No votes recorded yet.</div>
-                            )}
-
-                            {Object.entries(summaryData).map(([mainSubject, subSubjects]) => {
-                                // Calculate Overall Group Score
-                                let groupTotalSum = 0;
-                                let groupTotalCount = 0;
-                                
-                                Object.values(subSubjects).forEach(votes => {
-                                    votes.forEach(v => {
-                                        gameState.categories.forEach(cat => {
-                                             groupTotalSum += parseFloat(v.scores[cat.id] || 0);
-                                             groupTotalCount++;
-                                        });
-                                    });
-                                });
-
-                                const groupOverallAverage = groupTotalCount ? (groupTotalSum / groupTotalCount).toFixed(2) : "0.00";
-
-                                return (
-                                <div key={mainSubject} className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-4 gap-4">
-                                        <h2 className="text-2xl font-black text-zinc-900 dark:text-white">{mainSubject}</h2>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-zinc-400 text-sm font-bold uppercase tracking-wider">Overall Group Score</span>
-                                            <span className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-2 rounded-lg font-black text-xl">{groupOverallAverage}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex flex-col gap-2">
-                                        {/* Table Header */}
-                                        <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-bold text-zinc-400 uppercase tracking-wider hidden md:grid">
-                                            <div className="col-span-3">Participant / Item</div>
-                                            <div className="col-span-7">Category Breakdown</div>
-                                            <div className="col-span-2 text-right">Average</div>
-                                        </div>
-
-                                        {Object.entries(subSubjects).map(([subName, votes]) => {
-                                            // Calculate average for this sub-item
-                                            let totalSum = 0;
-                                            const catScores = {};
-                                            
-                                            votes.forEach(v => {
-                                                gameState.categories.forEach(cat => {
-                                                    const s = parseFloat(v.scores[cat.id] || 0);
-                                                    catScores[cat.id] = (catScores[cat.id] || 0) + s;
-                                                    totalSum += s;
-                                                });
-                                            });
-                                            
-                                            const catAvgs = gameState.categories.map(cat => ({
-                                                ...cat,
-                                                avg: (catScores[cat.id] / votes.length).toFixed(1)
-                                            }));
-
-                                            const totalAvg = (totalSum / (votes.length * gameState.categories.length)).toFixed(2);
-
-                                            // Display Name Cleanup
-                                            let displayName = subName;
-                                            if (subName === mainSubject || subName === `${mainSubject} (Group)`) displayName = "Group Evaluation";
-                                            else displayName = subName.replace(`${mainSubject} - `, '');
-
-                                            return (
-                                                <div key={subName} className="bg-zinc-50 dark:bg-zinc-950/30 rounded-xl p-4 md:grid md:grid-cols-12 md:gap-4 md:items-center hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700">
-                                                    
-                                                    {/* Name */}
-                                                    <div className="md:col-span-3 flex justify-between md:block mb-2 md:mb-0">
-                                                        <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-200">{displayName}</h3>
-                                                        <span className="md:hidden text-xs font-bold bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-500">{votes.length} votes</span>
-                                                    </div>
-
-                                                    {/* Scores Breakdown */}
-                                                    <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 mb-3 md:mb-0">
-                                                        {catAvgs.map((cat, i) => (
-                                                            <div key={cat.id} className="flex items-center gap-2">
-                                                                <div className={`w-2 h-2 rounded-full ${COLORS[i % COLORS.length]} flex-shrink-0`}></div>
-                                                                <span className="text-xs font-bold text-zinc-500 truncate max-w-[80px]">{cat.name}:</span>
-                                                                <span className="text-sm font-black text-zinc-900 dark:text-white">{cat.avg}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-
-                                                    {/* Total Average */}
-                                                    <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-zinc-100 dark:border-zinc-800 pt-2 md:pt-0">
-                                                         <span className="md:hidden text-xs font-bold text-zinc-400 uppercase">Total Score</span>
-                                                         <div className="flex items-center gap-3">
-                                                            <span className="hidden md:inline text-xs font-bold text-zinc-300">{votes.length} votes</span>
-                                                            <span className="text-xl font-black text-blue-600 dark:text-blue-400 tabular-nums">{totalAvg}</span>
-                                                         </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )})}
-                        </div>
-                    </div>
-                );
+                return <ResultsView gameState={gameState} onClose={() => setShowSummary(false)} />;
             }
 
             // Dashboard View
@@ -658,7 +680,14 @@
                                                 <h4 className="text-5xl font-black text-zinc-900 dark:text-white">{gameState.currentSubject}</h4>
                                                 <div className="mt-2 text-zinc-500 font-bold">{gameState.votingMode !== 'group' ? 'Multi-part Assessment' : 'Group Assessment'}</div>
                                             </div>
-                                            <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-6 py-3 rounded-xl font-bold text-2xl">{uniqueVoters} voters</span>
+                                            <div className="flex flex-col items-end gap-2">
+                                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white px-6 py-2 rounded-xl font-black text-2xl border border-zinc-200 dark:border-zinc-700">
+                                                    {uniqueVoters} / {studentCount} Votes
+                                                </span>
+                                                <span className="bg-zinc-100 dark:bg-zinc-800/50 text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-2 rounded-lg flex items-center gap-2 border border-transparent dark:border-zinc-800">
+                                                    {liveStudentCount} Online Now
+                                                </span>
+                                            </div>
                                         </div>
                                         
                                         {/* Simple visualization for Dashboard */}
@@ -687,7 +716,11 @@
                                         <div className="bg-zinc-50 dark:bg-zinc-800/50 p-8 rounded-full mb-6 scale-150">
                                             <IconPlay />
                                         </div>
-                                        <span className="font-bold text-xl">Ready for next evaluation</span>
+                                        <span className="font-bold text-xl mb-4">Ready for next evaluation</span>
+                                        <div className="bg-zinc-100 dark:bg-zinc-800/50 text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest px-6 py-3 rounded-2xl border border-transparent dark:border-zinc-800 flex items-center gap-3 animate-fadeIn">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                            {liveStudentCount} {liveStudentCount === 1 ? 'Student' : 'Students'} Connected
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -699,9 +732,10 @@
 
         function StudentView({ gameState, isDark }) {
             const [submitted, setSubmitted] = useState(false);
-            const [lastSub, setLastSub] = useState('');
+            const [localSubject, setLocalSubject] = useState(''); // Tracks active subject to detect changes
             const [currentStepIndex, setCurrentStepIndex] = useState(0);
             const [allScores, setAllScores] = useState({}); // { "stepKey": { scores } }
+            const [showResults, setShowResults] = useState(false);
 
             // Construct the steps based on mode
             const steps = useMemo(() => {
@@ -720,14 +754,31 @@
             }, [gameState]);
 
             useEffect(() => {
-                if (gameState && gameState.currentSubject !== lastSub) {
+                if (!gameState) return;
+
+                // 1. Detect New Subject
+                // We check against a local state to prevent resetting form on every socket update (tick)
+                if (gameState.currentSubject !== localSubject) {
+                    setLocalSubject(gameState.currentSubject);
                     setSubmitted(false);
                     setAllScores({});
                     setCurrentStepIndex(0);
+                    setShowResults(false); // Close results when subject changes
+                } 
+                
+                // 2. Detect Voting Start Logic
+                // If voting is OPEN and we haven't submitted yet, ensure we are not viewing results
+                if (gameState.isVotingOpen && !submitted && showResults) {
+                    setShowResults(false);
                 }
-            }, [gameState]);
+            }, [gameState, localSubject, submitted, showResults]);
 
             if (!gameState || !gameState.sessionId) return <div className="min-h-screen flex items-center justify-center text-zinc-300 font-black text-xs uppercase tracking-[0.2em] animate-pulse">Syncing...</div>;
+
+            // Show Results Overlay
+            if (showResults) {
+                return <ResultsView gameState={gameState} onClose={() => setShowResults(false)} />;
+            }
 
             // Waiting Screen
             if (!gameState.isVotingOpen) return (
@@ -735,7 +786,14 @@
                     <div className="max-w-xs animate-fadeIn bg-white dark:bg-zinc-900 p-8 rounded-3xl border-b border-zinc-200 dark:border-zinc-800">
                         <div className="text-zinc-300 dark:text-zinc-600 mb-6 flex justify-center scale-150"><IconStop /></div>
                         <h2 className="text-2xl font-black text-zinc-900 dark:text-white mb-2">Voting Closed</h2>
-                        <p className="text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed">Eyes on the board!<br/>Waiting for the next subject.</p>
+                        <p className="text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed mb-8">Eyes on the board!<br/>Waiting for the next subject.</p>
+                        
+                        <button 
+                            onClick={() => setShowResults(true)}
+                            className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold py-3 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition flex items-center justify-center gap-2"
+                        >
+                            <IconList /> View Results
+                        </button>
                     </div>
                 </div>
             );
@@ -747,7 +805,13 @@
                         <IconCheck />
                     </div>
                     <h2 className="text-4xl font-black text-zinc-900 dark:text-white mb-3">Sent!</h2>
-                    <p className="text-zinc-400 font-bold text-lg">You're all set.</p>
+                    <p className="text-zinc-400 font-bold text-lg mb-8">You're all set.</p>
+                    <button 
+                        onClick={() => setShowResults(true)}
+                        className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold px-8 py-3 rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition flex items-center gap-2"
+                    >
+                        <IconList /> View Results
+                    </button>
                 </div>
             );
 
@@ -784,7 +848,7 @@
                     
                     socket.emit('student-submit-vote', { items });
                     setSubmitted(true);
-                    setLastSub(gameState.currentSubject);
+                    // localSubject already tracks current subject, no need to manually set lastSub
                 }
             };
 

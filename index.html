@@ -134,7 +134,9 @@
             ],
             votes: [],
             categories: [],
-            name: 'Demo Session'
+            name: 'Demo Session',
+            connectedClients: 0,
+            lastSessionClientCount: 0
         };
 
         function ThemeToggle({ isDark, toggle }) {
@@ -449,6 +451,17 @@
             
             // Calculate unique voters
             const uniqueVoters = new Set(currentVotes.map(v => v.clientId)).size;
+            
+            // Get Total Clients - Subtract 1 for Host (Teacher)
+            // If gameState.connectedClients is undefined (mock), default to 1 so subtraction gives 0 students
+            const totalConnections = gameState.connectedClients || 1;
+            
+            // If voting is open, use LIVE count. If closed, use HISTORICAL snapshot.
+            // Fallback to totalConnections if historical is missing (legacy)
+            const activeTotal = gameState.isVotingOpen ? totalConnections : (gameState.lastSessionClientCount || totalConnections);
+            
+            const studentCount = Math.max(0, activeTotal - 1);
+            const liveStudentCount = Math.max(0, totalConnections - 1); // Always need live for the 'Connected' badge
 
             // Live Update Fix:
             // Regardless of voting mode, we want to show the aggregate "Group Grade" on the main screen.
@@ -508,7 +521,7 @@
                             </div>
                             <button 
                                 onClick={() => socket.emit('host-update-status', { isVotingOpen: false })} 
-                                className="bg-red-600 hover:bg-red-500 text-white px-10 py-6 rounded-3xl font-black text-2xl flex items-center gap-4 transition-all shadow-lg shadow-red-500/20"
+                                className="bg-red-600 hover:bg-red-500 text-white px-10 py-6 rounded-3xl font-black text-2xl flex items-center gap-4 transition-all shadow-lg"
                             >
                                 <IconStop /> END VOTING
                             </button>
@@ -519,8 +532,9 @@
                             
                             {/* Huge Vote Counter */}
                             <div className="text-center animate-fadeIn">
-                                <div className="text-[12rem] leading-none font-black text-zinc-900 dark:text-white tabular-nums tracking-tighter">
+                                <div className="text-[12rem] leading-none font-black text-zinc-900 dark:text-white tabular-nums tracking-tighter flex items-baseline">
                                     {uniqueVoters}
+                                    <span className="text-[6rem] text-zinc-300 dark:text-zinc-700 ml-4">/{studentCount}</span>
                                 </div>
                                 <div className="text-zinc-500 font-black uppercase tracking-[0.2em] text-2xl mt-4">Voters</div>
                             </div>
@@ -666,7 +680,14 @@
                                                 <h4 className="text-5xl font-black text-zinc-900 dark:text-white">{gameState.currentSubject}</h4>
                                                 <div className="mt-2 text-zinc-500 font-bold">{gameState.votingMode !== 'group' ? 'Multi-part Assessment' : 'Group Assessment'}</div>
                                             </div>
-                                            <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-6 py-3 rounded-xl font-bold text-2xl">{uniqueVoters} voters</span>
+                                            <div className="flex flex-col items-end gap-2">
+                                                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white px-6 py-2 rounded-xl font-black text-2xl border border-zinc-200 dark:border-zinc-700">
+                                                    {uniqueVoters} / {studentCount} Votes
+                                                </span>
+                                                <span className="bg-zinc-100 dark:bg-zinc-800/50 text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-4 py-2 rounded-lg flex items-center gap-2 border border-transparent dark:border-zinc-800">
+                                                    {liveStudentCount} Online Now
+                                                </span>
+                                            </div>
                                         </div>
                                         
                                         {/* Simple visualization for Dashboard */}
@@ -695,7 +716,11 @@
                                         <div className="bg-zinc-50 dark:bg-zinc-800/50 p-8 rounded-full mb-6 scale-150">
                                             <IconPlay />
                                         </div>
-                                        <span className="font-bold text-xl">Ready for next evaluation</span>
+                                        <span className="font-bold text-xl mb-4">Ready for next evaluation</span>
+                                        <div className="bg-zinc-100 dark:bg-zinc-800/50 text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest px-6 py-3 rounded-2xl border border-transparent dark:border-zinc-800 flex items-center gap-3 animate-fadeIn">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                            {liveStudentCount} {liveStudentCount === 1 ? 'Student' : 'Students'} Connected
+                                        </div>
                                     </div>
                                 )}
                             </div>

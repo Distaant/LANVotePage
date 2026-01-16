@@ -82,7 +82,9 @@ let gameState = {
   isVotingOpen: false,
   votes: [], 
   availableIps: getNetworkInterfaces(), // Send all found IPs to frontend
-  selectedIpIndex: 0 // Default to the first one found
+  selectedIpIndex: 0, // Default to the first one found
+  connectedClients: 0, // New: Track number of connected sockets/devices
+  lastSessionClientCount: 0 // New: Historical snapshot of clients when vote closed
 };
 
 // --- Connection Tracking (Map IP -> Socket ID) ---
@@ -206,11 +208,19 @@ io.on('connection', async (socket) => {
   
   // Refresh IPs on connection (in case network changed)
   gameState.availableIps = getNetworkInterfaces();
-  socket.emit('state-update', gameState);
+  
+  // Update connected clients count
+  gameState.connectedClients = activeConnections.size;
+  
+  // Broadcast update
+  io.emit('state-update', gameState);
 
   socket.on('disconnect', () => {
     if (activeConnections.get(clientId) === socket.id) {
       activeConnections.delete(clientId);
+      // Update connected clients count
+      gameState.connectedClients = activeConnections.size;
+      io.emit('state-update', gameState);
     }
   });
 
@@ -230,6 +240,12 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('host-update-status', (data) => {
+    // Logic for Historical Snapshot:
+    // If we are closing the vote (isVotingOpen going from true -> false), snapshot the current count.
+    if (gameState.isVotingOpen && data.isVotingOpen === false) {
+        gameState.lastSessionClientCount = gameState.connectedClients;
+    }
+
     if (data.currentSubject !== undefined) gameState.currentSubject = data.currentSubject;
     if (data.isVotingOpen !== undefined) gameState.isVotingOpen = data.isVotingOpen;
     // New fields for Participants

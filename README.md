@@ -10,9 +10,11 @@ Features
 - CSV Export.
 - Live voting updates.
 - Multiple voting modes:
-  . Group Only -> You only vote for the group grade.
-  . Group + Participants -> You vote for the group grade and each participants grade.
-  . Participans Only -> You only vote for each participants grade, group grade is the average of all grades.
+  > Group Only -> You only vote for the group grade.
+  
+  > Group + Participants -> You vote for the group grade and each participants grade.
+  
+  > Participans Only -> You only vote for each participants grade, group grade is the average of all grades.
 - Network selection (In case you have multiple networks, for example VMs).
 - Ability to choose criteria and max/min grades.
 - Cool UI

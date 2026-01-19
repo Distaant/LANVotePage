@@ -1,46 +1,51 @@
 #!/bin/bash
 
-# [cite_start]Classroom Grading App Launcher [cite: 1]
+# Set the window title (works in most terminal emulators)
+echo -ne "\033]0;Classroom Grading App Launcher\007"
 
+# Clear the screen
 clear
+
 echo "==========================================="
 echo "      Classroom Grading App Launcher"
 echo "==========================================="
 echo ""
 
-# [cite_start]1. Check if Node.js is installed [cite: 2]
+# 1. Check if Node.js is installed
 if ! command -v node &> /dev/null; then
-    [cite_start]echo "[ERROR] Node.js is not installed!" [cite: 2]
-    [cite_start]echo "Please install it from https://nodejs.org/" [cite: 2]
+    echo "[ERROR] Node.js is not installed!"
+    echo "Please install it from https://nodejs.org/"
     echo ""
     read -p "Press enter to exit"
     exit 1
 fi
 
-# [cite_start]2. Check and Install Dependencies [cite: 2]
+# 2. Check and Install Dependencies
 if [ ! -d "node_modules" ]; then
-    [cite_start]echo "[INFO] First time setup detected. Installing required libraries..." [cite: 2]
-    [cite_start]echo "[INFO] Installing: express socket.io ip" [cite: 2]
-    npm install express socket.io ip
+    echo "[INFO] First time setup detected. Installing required libraries..."
+    echo "[INFO] Installing: express socket.io ip"
     
+    npm install express socket.io ip
+
     if [ $? -ne 0 ]; then
         echo ""
-        [cite_start]echo "[ERROR] Failed to install dependencies. Check your internet connection." [cite: 3]
+        echo "[ERROR] Failed to install dependencies. Check your internet connection."
         read -p "Press enter to exit"
         exit 1
     fi
-    [cite_start]echo "[SUCCESS] Libraries installed successfully." [cite: 2]
+    
+    echo "[SUCCESS] Libraries installed successfully."
     echo ""
 else
-    [cite_start]echo "[INFO] Dependencies found. Starting server..." [cite: 2]
+    echo "[INFO] Dependencies found. Starting server..."
 fi
 
-# [cite_start]3. Run the Server [cite: 4]
+# 3. Run the Server
 echo ""
-[cite_start]echo "[INFO] Starting Server..." [cite: 4]
-[cite_start]node server.js [cite: 4]
+echo "[INFO] Starting Server..."
+node server.js
 
-# [cite_start]4. Keep window open if it crashes [cite: 4]
+# 4. Keep window open if it crashes or stops
 echo ""
-[cite_start]echo "[SERVER STOPPED]" [cite: 4]
+echo "[SERVER STOPPED]"
 read -p "Press enter to exit"
